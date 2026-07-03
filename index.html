@@ -13,37 +13,36 @@
           <span class="brand-mark" aria-hidden="true">G</span>
           <span>
             <strong>GeoGrub</strong>
-            <small>Short-term location intelligence</small>
+            <small>Pop-up and food truck planner</small>
           </span>
         </a>
-        <nav class="nav-pills" aria-label="Planner modes">
-          <button class="nav-pill active" type="button">Plan</button>
-          <button class="nav-pill" type="button">Route</button>
-          <button class="nav-pill" type="button">Report</button>
+        <nav class="nav-pills" aria-label="Planner views">
+          <button class="nav-pill active" type="button" data-view="plan">Plan</button>
+          <button class="nav-pill" type="button" data-view="route">Route</button>
+          <button class="nav-pill" type="button" data-view="report">Report</button>
         </nav>
       </header>
 
       <section class="workspace">
         <aside class="planner-panel" aria-label="GeoGrub planner controls">
           <div class="panel-heading">
-            <p class="eyebrow">Weekend command center</p>
+            <p class="eyebrow">MVP planner</p>
             <h1>Find the right curb, crowd, and clock.</h1>
             <p>
-              Score pop-up and food truck locations by event demand, nearby audiences,
-              weather fit, competition, access, and permit friction.
+              Add candidate pop-up locations, score demand and operating risk, then export
+              a practical short-term vending plan.
             </p>
           </div>
 
-          <form id="plannerForm" class="control-grid">
+          <form id="planForm" class="control-grid">
             <label>
-              City
-              <select id="city">
-                <option value="austin">Austin, TX</option>
-                <option value="seattle">Seattle, WA</option>
-                <option value="atlanta">Atlanta, GA</option>
-              </select>
+              Plan name
+              <input id="planName" type="text" value="Weekend taco route" />
             </label>
-
+            <label>
+              City or market
+              <input id="marketName" type="text" value="Austin, TX" />
+            </label>
             <label>
               Vendor type
               <select id="vendor">
@@ -53,84 +52,124 @@
                 <option value="retail">Maker goods</option>
               </select>
             </label>
-
             <label>
-              Daypart
+              Selling window
               <select id="daypart">
                 <option value="lunch">Lunch rush</option>
                 <option value="evening">Evening event</option>
                 <option value="weekend">Weekend market</option>
               </select>
             </label>
-
             <label>
               Weather tolerance
               <input id="weatherTolerance" type="range" min="1" max="10" value="6" />
               <span class="range-row"><span>Low</span><output id="weatherValue">6</output><span>High</span></span>
             </label>
-
-            <button class="primary-action" type="submit">
-              Generate opportunity plan
-            </button>
           </form>
+
+          <div class="button-row">
+            <button id="savePlanBtn" class="primary-action" type="button">Save plan</button>
+            <button id="resetBtn" class="secondary-action" type="button">Reset demo</button>
+          </div>
 
           <section class="agent-strip" aria-label="GeoGrub analysis agents">
             <article>
               <span>01</span>
               <strong>Event Scout</strong>
-              <p>Matches selling windows to nearby concerts, campuses, markets, and games.</p>
+              <p>Scores nearby events, markets, venues, campuses, and crowd timing.</p>
             </article>
             <article>
               <span>02</span>
               <strong>Demand Analyst</strong>
-              <p>Balances crowd signals, complementary venues, and competition pressure.</p>
+              <p>Balances audience fit, access, weather, competition, and permit friction.</p>
             </article>
             <article>
               <span>03</span>
               <strong>Route Planner</strong>
-              <p>Turns ranked spots into a practical short-term operating schedule.</p>
+              <p>Turns ranked opportunities into a short operating schedule and report.</p>
             </article>
           </section>
         </aside>
 
-        <section class="map-stage" aria-label="GeoGrub opportunity map">
-          <div class="map-toolbar">
-            <div>
-              <p class="eyebrow">Live plan preview</p>
-              <h2 id="mapTitle">Austin pop-up opportunities</h2>
-            </div>
-            <div class="score-chip">
-              <span id="avgScore">84</span>
-              <small>avg fit</small>
-            </div>
-          </div>
-
-          <div class="map-canvas" id="mapCanvas" aria-label="Abstract city opportunity map">
-            <div class="street horizontal h1"></div>
-            <div class="street horizontal h2"></div>
-            <div class="street horizontal h3"></div>
-            <div class="street vertical v1"></div>
-            <div class="street vertical v2"></div>
-            <div class="street vertical v3"></div>
-          </div>
-
-          <div class="result-grid">
-            <section class="ranked-list" aria-label="Ranked location results">
-              <div class="section-title">
-                <h2>Ranked stops</h2>
-                <button id="shuffleBtn" type="button">Rebalance</button>
+        <section class="main-stage" aria-label="GeoGrub workspace">
+          <section class="view active" data-panel="plan">
+            <div class="stage-toolbar">
+              <div>
+                <p class="eyebrow">Opportunity map</p>
+                <h2 id="mapTitle">Austin, TX pop-up plan</h2>
               </div>
-              <div id="locations"></div>
-            </section>
-
-            <section class="schedule-card" aria-label="Recommended schedule">
-              <div class="section-title">
-                <h2>Suggested run</h2>
-                <span id="scheduleDate">Fri - Sun</span>
+              <div class="score-chip">
+                <span id="avgScore">0</span>
+                <small>avg fit</small>
               </div>
-              <ol id="schedule"></ol>
-            </section>
-          </div>
+            </div>
+
+            <div class="map-canvas" id="mapCanvas" aria-label="Abstract city opportunity map">
+              <div class="street horizontal h1"></div>
+              <div class="street horizontal h2"></div>
+              <div class="street horizontal h3"></div>
+              <div class="street vertical v1"></div>
+              <div class="street vertical v2"></div>
+              <div class="street vertical v3"></div>
+            </div>
+
+            <div class="result-grid">
+              <section class="ranked-list" aria-label="Ranked location results">
+                <div class="section-title">
+                  <h2>Ranked stops</h2>
+                  <button id="rebalanceBtn" type="button">Rebalance</button>
+                </div>
+                <div id="locations"></div>
+              </section>
+
+              <section class="editor-card" aria-label="Add candidate location">
+                <div class="section-title">
+                  <h2>Add candidate</h2>
+                  <span id="candidateCount">0 stops</span>
+                </div>
+                <form id="candidateForm" class="candidate-form">
+                  <label>
+                    Location name
+                    <input id="candidateName" type="text" placeholder="e.g. Arts district plaza" required />
+                  </label>
+                  <label>
+                    Short note
+                    <input id="candidateCue" type="text" placeholder="Crowd signal or sales hypothesis" required />
+                  </label>
+                  <div class="slider-grid">
+                    <label>Event demand <input id="eventScore" type="range" min="0" max="100" value="80" /></label>
+                    <label>Access <input id="accessScore" type="range" min="0" max="100" value="75" /></label>
+                    <label>Weather fit <input id="weatherScore" type="range" min="0" max="100" value="70" /></label>
+                    <label>Competition pressure <input id="competitionScore" type="range" min="0" max="100" value="55" /></label>
+                    <label>Permit readiness <input id="permitScore" type="range" min="0" max="100" value="65" /></label>
+                  </div>
+                  <button class="primary-action" type="submit">Add to plan</button>
+                </form>
+              </section>
+            </div>
+          </section>
+
+          <section class="view" data-panel="route">
+            <div class="stage-toolbar">
+              <div>
+                <p class="eyebrow">Operating schedule</p>
+                <h2 id="routeTitle">Suggested run</h2>
+              </div>
+              <button id="copyRouteBtn" class="secondary-action" type="button">Copy route</button>
+            </div>
+            <ol id="schedule" class="route-list"></ol>
+          </section>
+
+          <section class="view" data-panel="report">
+            <div class="stage-toolbar">
+              <div>
+                <p class="eyebrow">Decision report</p>
+                <h2 id="reportTitle">GeoGrub report</h2>
+              </div>
+              <button id="downloadReportBtn" class="primary-action compact" type="button">Download markdown</button>
+            </div>
+            <textarea id="reportOutput" aria-label="Generated report"></textarea>
+          </section>
         </section>
       </section>
     </main>

@@ -35,7 +35,8 @@ body {
 
 button,
 select,
-input {
+input,
+textarea {
   font: inherit;
 }
 
@@ -82,11 +83,6 @@ button {
   display: block;
 }
 
-.brand strong {
-  font-size: 1.08rem;
-  letter-spacing: 0;
-}
-
 .brand small {
   color: var(--muted);
   font-size: 0.78rem;
@@ -119,16 +115,17 @@ button {
   display: grid;
   grid-template-columns: minmax(320px, 430px) minmax(0, 1fr);
   gap: 18px;
-  align-items: stretch;
+  align-items: start;
 }
 
 .planner-panel,
-.map-stage,
+.main-stage,
 .ranked-list,
-.schedule-card {
+.editor-card,
+.view {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.84);
+  background: rgba(255, 255, 255, 0.88);
   box-shadow: var(--shadow);
 }
 
@@ -160,7 +157,8 @@ button {
   text-transform: uppercase;
 }
 
-.control-grid {
+.control-grid,
+.candidate-form {
   display: grid;
   gap: 13px;
 }
@@ -174,20 +172,32 @@ label {
 }
 
 select,
-input[type="range"] {
+input[type="text"],
+textarea {
   width: 100%;
-}
-
-select {
-  min-height: 46px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 0 12px;
   color: var(--ink);
   background: white;
 }
 
+select,
+input[type="text"] {
+  min-height: 46px;
+  padding: 0 12px;
+}
+
+textarea {
+  min-height: 540px;
+  resize: vertical;
+  padding: 16px;
+  line-height: 1.5;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.9rem;
+}
+
 input[type="range"] {
+  width: 100%;
   accent-color: var(--accent);
 }
 
@@ -203,19 +213,39 @@ input[type="range"] {
   font-weight: 900;
 }
 
+.button-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+
 .primary-action,
-.section-title button {
-  border: 0;
+.secondary-action,
+.section-title button,
+.metric-stack button {
+  min-height: 42px;
   border-radius: 8px;
-  color: white;
-  background: var(--accent);
   font-weight: 850;
 }
 
-.primary-action {
-  min-height: 50px;
-  margin-top: 4px;
-  box-shadow: 0 16px 26px rgba(31, 143, 106, 0.22);
+.primary-action,
+.section-title button {
+  border: 0;
+  color: white;
+  background: var(--accent);
+  box-shadow: 0 16px 26px rgba(31, 143, 106, 0.18);
+}
+
+.primary-action.compact {
+  padding: 0 14px;
+}
+
+.secondary-action,
+.metric-stack button {
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: white;
 }
 
 .agent-strip {
@@ -238,10 +268,6 @@ input[type="range"] {
   font-weight: 900;
 }
 
-.agent-strip strong {
-  font-size: 0.9rem;
-}
-
 .agent-strip p {
   margin: 0;
   color: var(--muted);
@@ -249,12 +275,24 @@ input[type="range"] {
   line-height: 1.42;
 }
 
-.map-stage {
+.main-stage {
   min-width: 0;
   padding: 18px;
 }
 
-.map-toolbar,
+.view {
+  display: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.view.active {
+  display: block;
+}
+
+.stage-toolbar,
 .section-title {
   display: flex;
   align-items: center;
@@ -262,12 +300,12 @@ input[type="range"] {
   gap: 14px;
 }
 
-.map-toolbar h2,
+.stage-toolbar h2,
 .section-title h2 {
   margin: 4px 0 0;
 }
 
-.map-toolbar h2 {
+.stage-toolbar h2 {
   font-size: clamp(1.7rem, 4vw, 3.2rem);
   line-height: 1;
 }
@@ -301,7 +339,7 @@ input[type="range"] {
 
 .map-canvas {
   position: relative;
-  min-height: 420px;
+  min-height: 410px;
   margin: 18px 0;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -346,7 +384,7 @@ input[type="range"] {
   border: 1px solid rgba(21, 21, 19, 0.1);
   border-radius: 8px;
   padding: 12px;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 16px 32px rgba(42, 53, 38, 0.16);
   transform: translate(-50%, -50%);
 }
@@ -392,12 +430,12 @@ input[type="range"] {
 
 .result-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
   gap: 18px;
 }
 
 .ranked-list,
-.schedule-card {
+.editor-card {
   padding: 18px;
   box-shadow: none;
 }
@@ -411,7 +449,6 @@ input[type="range"] {
 }
 
 .section-title button {
-  min-height: 36px;
   padding: 0 12px;
 }
 
@@ -451,6 +488,23 @@ input[type="range"] {
   line-height: 1.38;
 }
 
+.driver-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.driver-row span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: var(--muted);
+  background: white;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
 .metric-stack {
   display: grid;
   justify-items: end;
@@ -469,22 +523,35 @@ input[type="range"] {
   font-weight: 800;
 }
 
-#schedule {
-  margin: 0;
+.metric-stack button {
+  min-height: 30px;
+  padding: 0 10px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.slider-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+}
+
+.route-list {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0 0;
   padding: 0;
   list-style: none;
 }
 
-#schedule li {
+.route-list li {
   display: grid;
-  grid-template-columns: 72px 1fr;
-  gap: 12px;
-  padding: 14px 0;
-  border-top: 1px solid var(--line);
-}
-
-#schedule li:first-child {
-  border-top: 0;
+  grid-template-columns: 96px 1fr;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
 }
 
 .time {
@@ -500,11 +567,10 @@ input[type="range"] {
   display: block;
   margin-top: 4px;
   color: var(--muted);
-  font-size: 0.85rem;
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
-@media (max-width: 1050px) {
+@media (max-width: 1120px) {
   .workspace,
   .result-grid {
     grid-template-columns: 1fr;
@@ -526,27 +592,30 @@ input[type="range"] {
     flex-direction: column;
   }
 
-  .nav-pills {
+  .nav-pills,
+  .button-row,
+  .slider-grid {
     width: 100%;
+    grid-template-columns: 1fr;
+  }
+
+  .nav-pills {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
   }
 
   .nav-pill {
-    flex: 1;
+    padding-inline: 6px;
   }
 
   .planner-panel,
-  .map-stage,
+  .main-stage,
   .ranked-list,
-  .schedule-card {
-    border-radius: 8px;
-  }
-
-  .planner-panel,
-  .map-stage {
+  .editor-card {
     padding: 16px;
   }
 
-  .map-toolbar {
+  .stage-toolbar {
     align-items: flex-start;
   }
 
@@ -574,5 +643,9 @@ input[type="range"] {
   .metric-stack {
     grid-column: 2;
     justify-items: start;
+  }
+
+  .route-list li {
+    grid-template-columns: 1fr;
   }
 }

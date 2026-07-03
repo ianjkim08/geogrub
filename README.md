@@ -1,30 +1,56 @@
 # GeoGrub
 
-GeoGrub is an AI location planner for short-term pop-up shops, food trucks, carts, and market vendors.
+GeoGrub is a lightweight MVP for planning short-term pop-up shop and food truck locations.
 
-Instead of recommending permanent storefronts, GeoGrub helps vendors decide where and when to operate for a specific selling window. It ranks temporary vending spots by event demand, nearby audience fit, weather risk, access, competition, and permit friction, then turns the ranked list into a practical route or weekend schedule.
+The app helps vendors compare possible stops, score operating fit, build a short route, and export a decision report. It is designed to be useful without API keys: a vendor can enter candidate spots from their own research, score the signals they care about, and leave with a practical operating plan.
 
-## Why it is meaningfully different
+## MVP scope
 
-- It focuses on temporary vending decisions, not permanent retail site selection.
-- It recommends daypart-specific routes and pop-up schedules, not storefront locations.
-- It uses event timing, weather, access, and permit friction as first-class scoring factors.
-- It serves mobile vendors, makers, and food trucks rather than a single restaurant category.
-- Its output is operational: where to park, when to show up, and what setup risk to watch.
+- Create a named pop-up or food truck plan.
+- Set market, vendor type, selling window, and weather tolerance.
+- Add custom candidate locations.
+- Score each location across event demand, access, weather fit, competition pressure, and permit readiness.
+- Re-rank stops using a transparent scoring model.
+- Remove weak candidates.
+- Save the plan in local browser storage.
+- Generate a route view with suggested selling times.
+- Export a Markdown decision report.
 
-## Agent model
+## Why this is different from a storefront finder
 
-| Agent | Role |
-| --- | --- |
-| Event Scout | Finds concerts, games, markets, campus events, and local foot-traffic spikes. |
-| Demand Analyst | Scores nearby audiences, complementary businesses, transit, and crowd density. |
-| Competition Mapper | Flags similar vendors or restaurants competing for the same demand. |
-| Weather & Timing Analyst | Adjusts recommendations based on daypart, forecast, and product sensitivity. |
-| Permit/Risk Advisor | Identifies locations with operational restrictions or higher setup friction. |
-| Route Planner | Turns ranked opportunities into a realistic short-term operating schedule. |
+GeoGrub focuses on short-term vending decisions rather than permanent retail site selection. Its output is operational: where to test, when to arrive, what risks to check, and which location deserves first priority.
 
-## Prototype
+## Scoring model
 
-Open `index.html` in a browser. The prototype runs locally with sample data and does not require API keys.
+GeoGrub combines:
 
-Future production data sources could include city event calendars, Google Places, weather APIs, transit data, venue calendars, city permit pages, and historical sales imported by the vendor.
+- Event demand
+- Access
+- Weather fit
+- Competition pressure
+- Permit readiness
+
+Competition is inverted, so higher competition reduces the final fit score. Vendor type, selling window, and weather tolerance adjust the weights.
+
+## Run locally
+
+Open `index.html` in a browser, or serve the folder:
+
+```bash
+python3 -m http.server 4177
+```
+
+Then visit:
+
+```text
+http://127.0.0.1:4177/
+```
+
+## Future production integrations
+
+- Google Places or Mapbox for place discovery and maps
+- Eventbrite, PredictHQ, Ticketmaster, or city calendars for event demand
+- Weather API for forecast-aware scoring
+- City permit pages or manually curated permit datasets
+- CSV import for historical sales and vendor notes
+- Backend accounts for saved multi-market plans
