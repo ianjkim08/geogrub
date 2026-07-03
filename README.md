@@ -9,6 +9,10 @@ The app helps vendors compare possible stops, score operating fit, build a short
 - Create a named pop-up or food truck plan.
 - Set market, vendor type, selling window, and weather tolerance.
 - Add custom candidate locations.
+- Place candidates on an interactive map.
+- Click map pins or ranked cards to focus a location.
+- Zoom with map controls, mouse wheel, or plus/minus keys.
+- Pan the map by dragging or using arrow keys while the map is focused.
 - Score each location across event demand, access, weather fit, competition pressure, and permit readiness.
 - Re-rank stops using a transparent scoring model.
 - Remove weak candidates.

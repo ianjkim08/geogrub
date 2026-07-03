@@ -104,13 +104,29 @@
               </div>
             </div>
 
-            <div class="map-canvas" id="mapCanvas" aria-label="Abstract city opportunity map">
-              <div class="street horizontal h1"></div>
-              <div class="street horizontal h2"></div>
-              <div class="street horizontal h3"></div>
-              <div class="street vertical v1"></div>
-              <div class="street vertical v2"></div>
-              <div class="street vertical v3"></div>
+            <div class="map-shell">
+              <div class="map-controls" aria-label="Map controls">
+                <button id="zoomInBtn" type="button" aria-label="Zoom in">+</button>
+                <button id="zoomOutBtn" type="button" aria-label="Zoom out">-</button>
+                <button id="centerMapBtn" type="button">Center</button>
+              </div>
+              <div class="map-status" id="mapStatus">Click the map to place the next candidate.</div>
+              <div class="map-canvas" id="mapCanvas" role="application" aria-label="Interactive GeoGrub planning map" tabindex="0">
+                <div class="map-world" id="mapWorld">
+                  <div class="map-grid"></div>
+                  <div class="district district-a">Campus</div>
+                  <div class="district district-b">Market</div>
+                  <div class="district district-c">Nightlife</div>
+                  <div class="street horizontal h1"></div>
+                  <div class="street horizontal h2"></div>
+                  <div class="street horizontal h3"></div>
+                  <div class="street vertical v1"></div>
+                  <div class="street vertical v2"></div>
+                  <div class="street vertical v3"></div>
+                  <div id="pinLayer"></div>
+                  <button id="draftPin" class="draft-pin hidden" type="button" aria-label="Draft candidate location"></button>
+                </div>
+              </div>
             </div>
 
             <div class="result-grid">
@@ -136,6 +152,10 @@
                     Short note
                     <input id="candidateCue" type="text" placeholder="Crowd signal or sales hypothesis" required />
                   </label>
+                  <div class="coordinate-row">
+                    <span id="coordinateReadout">Map point: auto</span>
+                    <button id="clearDraftBtn" type="button">Clear point</button>
+                  </div>
                   <div class="slider-grid">
                     <label>Event demand <input id="eventScore" type="range" min="0" max="100" value="80" /></label>
                     <label>Access <input id="accessScore" type="range" min="0" max="100" value="75" /></label>

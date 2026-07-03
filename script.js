@@ -61,6 +61,19 @@ const daypartModifiers = {
 
 let plan = loadPlan();
 let rebalanceOffset = 0;
+let selectedLocationId = null;
+let draftPoint = null;
+const mapState = {
+  zoom: 1,
+  offsetX: 0,
+  offsetY: 0,
+  isDragging: false,
+  dragStartX: 0,
+  dragStartY: 0,
+  startOffsetX: 0,
+  startOffsetY: 0,
+  moved: false
+};
 
 const els = {
   navPills: document.querySelectorAll(".nav-pill"),
@@ -77,11 +90,20 @@ const els = {
   mapTitle: document.querySelector("#mapTitle"),
   avgScore: document.querySelector("#avgScore"),
   mapCanvas: document.querySelector("#mapCanvas"),
+  mapWorld: document.querySelector("#mapWorld"),
+  pinLayer: document.querySelector("#pinLayer"),
+  draftPin: document.querySelector("#draftPin"),
+  mapStatus: document.querySelector("#mapStatus"),
+  zoomInBtn: document.querySelector("#zoomInBtn"),
+  zoomOutBtn: document.querySelector("#zoomOutBtn"),
+  centerMapBtn: document.querySelector("#centerMapBtn"),
   locations: document.querySelector("#locations"),
   candidateCount: document.querySelector("#candidateCount"),
   candidateForm: document.querySelector("#candidateForm"),
   candidateName: document.querySelector("#candidateName"),
   candidateCue: document.querySelector("#candidateCue"),
+  coordinateReadout: document.querySelector("#coordinateReadout"),
+  clearDraftBtn: document.querySelector("#clearDraftBtn"),
   eventScore: document.querySelector("#eventScore"),
   accessScore: document.querySelector("#accessScore"),
   weatherScore: document.querySelector("#weatherScore"),
@@ -144,6 +166,42 @@ function scoreLocation(location) {
   return clampScore(raw);
 }
 
+function clampMapCoordinate(value) {
+  return Math.max(4, Math.min(96, Math.round(value)));
+}
+
+function applyMapTransform() {
+  els.mapWorld.style.transform = `translate(${mapState.offsetX}px, ${mapState.offsetY}px) scale(${mapState.zoom})`;
+}
+
+function screenToMapPoint(clientX, clientY) {
+  const rect = els.mapCanvas.getBoundingClientRect();
+  const x = ((clientX - rect.left - mapState.offsetX) / mapState.zoom / rect.width) * 100;
+  const y = ((clientY - rect.top - mapState.offsetY) / mapState.zoom / rect.height) * 100;
+  return {
+    x: clampMapCoordinate(x),
+    y: clampMapCoordinate(y)
+  };
+}
+
+function setDraftPoint(point) {
+  draftPoint = point;
+  els.coordinateReadout.textContent = `Map point: ${point.x}, ${point.y}`;
+  els.mapStatus.textContent = `Next candidate will be placed at ${point.x}, ${point.y}.`;
+  renderDraftPin();
+}
+
+function renderDraftPin() {
+  if (!draftPoint) {
+    els.draftPin.classList.add("hidden");
+    els.coordinateReadout.textContent = "Map point: auto";
+    return;
+  }
+  els.draftPin.classList.remove("hidden");
+  els.draftPin.style.left = `${draftPoint.x}%`;
+  els.draftPin.style.top = `${draftPoint.y}%`;
+}
+
 function scoreDrivers(location) {
   const risks = [];
   const strengths = [];
@@ -180,10 +238,13 @@ function recommendation(location, index) {
 }
 
 function renderMap(ranked) {
-  els.mapCanvas.querySelectorAll(".map-pin").forEach((pin) => pin.remove());
+  els.pinLayer.innerHTML = "";
   ranked.forEach((location, index) => {
-    const pin = document.createElement("article");
+    const pin = document.createElement("button");
     pin.className = "map-pin";
+    pin.type = "button";
+    pin.dataset.locationId = location.id;
+    pin.classList.toggle("selected", location.id === selectedLocationId);
     pin.style.left = `${location.x}%`;
     pin.style.top = `${location.y}%`;
     pin.innerHTML = `
@@ -191,15 +252,17 @@ function renderMap(ranked) {
       <small>${escapeHtml(location.cue)}</small>
       <span class="pin-score">${location.score}</span>
     `;
-    els.mapCanvas.appendChild(pin);
+    els.pinLayer.appendChild(pin);
   });
+  renderDraftPin();
+  applyMapTransform();
 }
 
 function renderLocations(ranked) {
   els.locations.innerHTML = ranked
     .map(
       (location, index) => `
-        <article class="location-card">
+        <article class="location-card ${location.id === selectedLocationId ? "selected" : ""}">
           <span class="rank">${index + 1}</span>
           <div>
             <h3>${escapeHtml(location.name)}</h3>
@@ -215,6 +278,7 @@ function renderLocations(ranked) {
           <div class="metric-stack">
             <span class="fit-score">${location.score}</span>
             <span class="risk">${riskLabel(location)}</span>
+            <button type="button" data-focus="${location.id}">Map</button>
             <button type="button" data-remove="${location.id}">Remove</button>
           </div>
         </article>
@@ -266,6 +330,7 @@ ${ranked
     const strengths = location.drivers.strengths.join(", ") || "balanced fundamentals";
     const risks = location.drivers.risks.join(", ") || "no major red flags";
     return `${index + 1}. ${location.name} - ${location.score}/99
+   - Map point: ${location.x}, ${location.y}
    - Best time: ${rec.time}
    - Strengths: ${strengths}
    - Risks: ${risks}
@@ -322,11 +387,37 @@ function addCandidate(event) {
     weather: Number(els.weatherScore.value),
     competition: Number(els.competitionScore.value),
     permit: Number(els.permitScore.value),
-    x: 18 + Math.round(Math.random() * 64),
-    y: 24 + Math.round(Math.random() * 52)
+    x: draftPoint?.x ?? 18 + Math.round(Math.random() * 64),
+    y: draftPoint?.y ?? 24 + Math.round(Math.random() * 52)
   });
+  draftPoint = null;
   els.candidateForm.reset();
   savePlan();
+  render();
+}
+
+function focusLocation(locationId) {
+  const location = plan.locations.find((item) => item.id === locationId);
+  if (!location) return;
+  selectedLocationId = locationId;
+  const rect = els.mapCanvas.getBoundingClientRect();
+  mapState.offsetX = rect.width / 2 - (location.x / 100) * rect.width * mapState.zoom;
+  mapState.offsetY = rect.height / 2 - (location.y / 100) * rect.height * mapState.zoom;
+  els.mapStatus.textContent = `Focused ${location.name} at ${location.x}, ${location.y}.`;
+  render();
+}
+
+function zoomMap(delta) {
+  mapState.zoom = Math.max(0.75, Math.min(2.2, Number((mapState.zoom + delta).toFixed(2))));
+  applyMapTransform();
+}
+
+function centerMap() {
+  mapState.zoom = 1;
+  mapState.offsetX = 0;
+  mapState.offsetY = 0;
+  selectedLocationId = null;
+  els.mapStatus.textContent = "Map centered. Click to place the next candidate.";
   render();
 }
 
@@ -366,6 +457,11 @@ els.savePlanBtn.addEventListener("click", () => {
 els.resetBtn.addEventListener("click", () => {
   plan = structuredClone(seedPlan);
   rebalanceOffset = 0;
+  selectedLocationId = null;
+  draftPoint = null;
+  mapState.zoom = 1;
+  mapState.offsetX = 0;
+  mapState.offsetY = 0;
   localStorage.removeItem(storageKey);
   hydrateInputs();
   render();
@@ -377,11 +473,96 @@ els.rebalanceBtn.addEventListener("click", () => {
 });
 
 els.locations.addEventListener("click", (event) => {
+  const focusButton = event.target.closest("[data-focus]");
+  if (focusButton) {
+    focusLocation(focusButton.dataset.focus);
+    return;
+  }
   const button = event.target.closest("[data-remove]");
   if (!button) return;
   plan.locations = plan.locations.filter((location) => location.id !== button.dataset.remove);
+  if (selectedLocationId === button.dataset.remove) selectedLocationId = null;
   savePlan();
   render();
+});
+
+els.pinLayer.addEventListener("click", (event) => {
+  const pin = event.target.closest("[data-location-id]");
+  if (!pin) return;
+  event.stopPropagation();
+  focusLocation(pin.dataset.locationId);
+});
+
+els.mapCanvas.addEventListener("pointerdown", (event) => {
+  if (event.target.closest(".map-pin") || event.target.closest(".draft-pin")) return;
+  mapState.isDragging = true;
+  mapState.moved = false;
+  mapState.dragStartX = event.clientX;
+  mapState.dragStartY = event.clientY;
+  mapState.startOffsetX = mapState.offsetX;
+  mapState.startOffsetY = mapState.offsetY;
+  els.mapCanvas.setPointerCapture(event.pointerId);
+});
+
+els.mapCanvas.addEventListener("pointermove", (event) => {
+  if (!mapState.isDragging) return;
+  const dx = event.clientX - mapState.dragStartX;
+  const dy = event.clientY - mapState.dragStartY;
+  if (Math.abs(dx) + Math.abs(dy) > 6) mapState.moved = true;
+  mapState.offsetX = mapState.startOffsetX + dx;
+  mapState.offsetY = mapState.startOffsetY + dy;
+  applyMapTransform();
+});
+
+els.mapCanvas.addEventListener("pointerup", (event) => {
+  if (!mapState.isDragging) return;
+  els.mapCanvas.releasePointerCapture(event.pointerId);
+  mapState.isDragging = false;
+  if (!mapState.moved) {
+    setDraftPoint(screenToMapPoint(event.clientX, event.clientY));
+  } else {
+    els.mapStatus.textContent = "Map moved. Click a spot to place the next candidate.";
+  }
+});
+
+els.mapCanvas.addEventListener("wheel", (event) => {
+  event.preventDefault();
+  zoomMap(event.deltaY < 0 ? 0.12 : -0.12);
+}, { passive: false });
+
+els.mapCanvas.addEventListener("keydown", (event) => {
+  const step = event.shiftKey ? 48 : 24;
+  const panKeys = {
+    ArrowUp: [0, step],
+    ArrowDown: [0, -step],
+    ArrowLeft: [step, 0],
+    ArrowRight: [-step, 0]
+  };
+  if (event.key === "+" || event.key === "=") {
+    event.preventDefault();
+    zoomMap(0.12);
+    return;
+  }
+  if (event.key === "-") {
+    event.preventDefault();
+    zoomMap(-0.12);
+    return;
+  }
+  if (!panKeys[event.key]) return;
+  event.preventDefault();
+  mapState.offsetX += panKeys[event.key][0];
+  mapState.offsetY += panKeys[event.key][1];
+  els.mapStatus.textContent = "Map moved. Click a spot to place the next candidate.";
+  applyMapTransform();
+});
+
+els.zoomInBtn.addEventListener("click", () => zoomMap(0.2));
+els.zoomOutBtn.addEventListener("click", () => zoomMap(-0.2));
+els.centerMapBtn.addEventListener("click", centerMap);
+els.clearDraftBtn.addEventListener("click", () => {
+  draftPoint = null;
+  els.mapStatus.textContent = "Draft point cleared. Click the map to place the next candidate.";
+  renderDraftPin();
 });
 
 els.navPills.forEach((button) => {
