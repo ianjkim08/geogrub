@@ -1,4 +1,5 @@
 const storageKey = "geogrub.mvp.plan";
+const weatherApiBase = "https://api.weather.gov";
 
 const marketCenters = {
   "austin": [30.2672, -97.7431],
@@ -109,6 +110,8 @@ const els = {
   candidateCue: document.querySelector("#candidateCue"),
   coordinateReadout: document.querySelector("#coordinateReadout"),
   clearDraftBtn: document.querySelector("#clearDraftBtn"),
+  weatherStatus: document.querySelector("#weatherStatus"),
+  refreshWeatherBtn: document.querySelector("#refreshWeatherBtn"),
   eventScore: document.querySelector("#eventScore"),
   accessScore: document.querySelector("#accessScore"),
   weatherScore: document.querySelector("#weatherScore"),
@@ -184,6 +187,78 @@ function clampScore(value) {
 
 function formatLatLng(point) {
   return `${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}`;
+}
+
+function parseWindMph(windSpeed) {
+  const matches = String(windSpeed || "").match(/\d+/g);
+  if (!matches) return 0;
+  return Math.max(...matches.map(Number));
+}
+
+function calculateWeatherFit(period) {
+  let score = 100;
+  const precipChance = Number(period.probabilityOfPrecipitation?.value ?? 0);
+  const wind = parseWindMph(period.windSpeed);
+  const temp = Number(period.temperature ?? 70);
+  const forecast = String(period.shortForecast || "").toLowerCase();
+
+  score -= precipChance * 0.45;
+  score -= Math.max(0, wind - 12) * 0.9;
+  score -= Math.max(0, 45 - temp) * 1.1;
+  score -= Math.max(0, temp - 92) * 1.2;
+  if (forecast.includes("thunder")) score -= 20;
+  if (forecast.includes("rain") || forecast.includes("showers")) score -= 12;
+  if (forecast.includes("snow") || forecast.includes("sleet") || forecast.includes("ice")) score -= 24;
+  if (forecast.includes("fog")) score -= 7;
+
+  return clampScore(score);
+}
+
+function weatherSummary(period) {
+  const precipChance = Number(period.probabilityOfPrecipitation?.value ?? 0);
+  return `${period.shortForecast || "Forecast"} · ${period.temperature}F · wind ${period.windSpeed || "n/a"} · precip ${precipChance}%`;
+}
+
+async function fetchWeatherFit(point) {
+  els.weatherStatus.textContent = "Fetching live weather...";
+  els.refreshWeatherBtn.disabled = true;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+  try {
+    const pointResponse = await fetch(`${weatherApiBase}/points/${point.lat.toFixed(4)},${point.lng.toFixed(4)}`, {
+      headers: { "Accept": "application/geo+json" },
+      signal: controller.signal
+    });
+    if (!pointResponse.ok) throw new Error(`Point lookup failed: ${pointResponse.status}`);
+    const pointData = await pointResponse.json();
+    const hourlyUrl = pointData.properties?.forecastHourly;
+    if (!hourlyUrl) throw new Error("Hourly forecast unavailable");
+
+    const hourlyResponse = await fetch(hourlyUrl, {
+      headers: { "Accept": "application/geo+json" },
+      signal: controller.signal
+    });
+    if (!hourlyResponse.ok) throw new Error(`Hourly forecast failed: ${hourlyResponse.status}`);
+    const hourlyData = await hourlyResponse.json();
+    const period = hourlyData.properties?.periods?.[0];
+    if (!period) throw new Error("Hourly period unavailable");
+
+    const fit = calculateWeatherFit(period);
+    const summary = weatherSummary(period);
+    draftPoint = {
+      ...draftPoint,
+      weatherFit: fit,
+      weatherSummary: summary
+    };
+    els.weatherScore.value = fit;
+    els.weatherStatus.textContent = `Weather fit ${fit}/99 · ${summary}`;
+  } catch (error) {
+    els.weatherStatus.textContent = "Weather unavailable. You can still set Weather fit manually.";
+  } finally {
+    clearTimeout(timeoutId);
+    els.refreshWeatherBtn.disabled = false;
+  }
 }
 
 function scoreLocation(location) {
@@ -307,6 +382,7 @@ function setDraftPoint(latlng) {
   els.coordinateReadout.textContent = `Map point: ${formatLatLng(draftPoint)}`;
   els.mapStatus.textContent = `Next candidate will be placed at ${formatLatLng(draftPoint)}.`;
   renderDraftMarker();
+  fetchWeatherFit(draftPoint);
 }
 
 function renderDraftMarker() {
@@ -344,6 +420,7 @@ function renderLocations(ranked) {
               <span>Weather ${location.weather}</span>
               <span>Comp ${location.competition}</span>
               <span>Permit ${location.permit}</span>
+              ${location.weatherSummary ? `<span>${escapeHtml(location.weatherSummary)}</span>` : ""}
               <span>${formatLatLng(location)}</span>
             </div>
           </div>
@@ -403,6 +480,7 @@ ${ranked
     const risks = location.drivers.risks.join(", ") || "no major red flags";
     return `${index + 1}. ${location.name} - ${location.score}/99
    - Coordinates: ${formatLatLng(location)}
+   - Weather: ${location.weatherSummary || "Manual weather score"}
    - Best time: ${rec.time}
    - Strengths: ${strengths}
    - Risks: ${risks}
@@ -463,7 +541,8 @@ function addCandidate(event) {
     competition: Number(els.competitionScore.value),
     permit: Number(els.permitScore.value),
     lat: point.lat,
-    lng: point.lng
+    lng: point.lng,
+    weatherSummary: draftPoint?.weatherSummary || "Manual weather score"
   });
   draftPoint = null;
   els.candidateForm.reset();
@@ -543,6 +622,7 @@ els.resetBtn.addEventListener("click", () => {
   draftPoint = null;
   localStorage.removeItem(storageKey);
   hydrateInputs();
+  els.weatherStatus.textContent = "Click the map to fetch weather for that location.";
   render();
   fitMapToLocations();
 });
@@ -572,7 +652,16 @@ els.centerMapBtn.addEventListener("click", centerMap);
 els.clearDraftBtn.addEventListener("click", () => {
   draftPoint = null;
   els.mapStatus.textContent = "Draft point cleared. Click the real map to place the next candidate.";
+  els.weatherStatus.textContent = "Click the map to fetch weather for that location.";
   renderDraftMarker();
+});
+
+els.refreshWeatherBtn.addEventListener("click", () => {
+  if (!draftPoint) {
+    els.weatherStatus.textContent = "Choose a map point first.";
+    return;
+  }
+  fetchWeatherFit(draftPoint);
 });
 
 els.navPills.forEach((button) => {

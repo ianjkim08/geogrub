@@ -4,12 +4,16 @@ GeoGrub is a lightweight MVP for planning short-term pop-up shop and food truck 
 
 The app helps vendors compare possible stops, score operating fit, build a short route, and export a decision report. It is designed to be useful without API keys: a vendor can enter candidate spots from their own research, score the signals they care about, and leave with a practical operating plan.
 
+Live demo: https://ianjkim08.github.io/geogrub/
+
 ## MVP scope
 
 - Create a named pop-up or food truck plan.
 - Set market, vendor type, selling window, and weather tolerance.
 - Add custom candidate locations.
 - Place candidates on a real Leaflet/OpenStreetMap map.
+- Fetch live weather from clicked map coordinates.
+- Auto-fill Weather fit using current precipitation, wind, apparent temperature, and weather condition.
 - Click map pins or ranked cards to focus a location.
 - Zoom with map controls or mouse wheel.
 - Pan the map by dragging.
@@ -35,6 +39,12 @@ GeoGrub combines:
 - Permit readiness
 
 Competition is inverted, so higher competition reduces the final fit score. Vendor type, selling window, and weather tolerance adjust the weights.
+
+## Live data
+
+GeoGrub uses the National Weather Service / Weather.gov API to turn a clicked U.S. latitude/longitude into a live weather fit score. The app looks up the grid forecast for the clicked point, fetches the hourly forecast, then converts temperature, precipitation chance, wind speed, and forecast language into the Weather fit input.
+
+Weather.gov is U.S.-focused. For non-U.S. markets, the app keeps the weather input editable so users can score conditions manually.
 
 ## Run locally
 
