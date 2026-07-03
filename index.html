@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>GeoGrub | Pop-up Location Planner</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -111,22 +112,7 @@
                 <button id="centerMapBtn" type="button">Center</button>
               </div>
               <div class="map-status" id="mapStatus">Click the map to place the next candidate.</div>
-              <div class="map-canvas" id="mapCanvas" role="application" aria-label="Interactive GeoGrub planning map" tabindex="0">
-                <div class="map-world" id="mapWorld">
-                  <div class="map-grid"></div>
-                  <div class="district district-a">Campus</div>
-                  <div class="district district-b">Market</div>
-                  <div class="district district-c">Nightlife</div>
-                  <div class="street horizontal h1"></div>
-                  <div class="street horizontal h2"></div>
-                  <div class="street horizontal h3"></div>
-                  <div class="street vertical v1"></div>
-                  <div class="street vertical v2"></div>
-                  <div class="street vertical v3"></div>
-                  <div id="pinLayer"></div>
-                  <button id="draftPin" class="draft-pin hidden" type="button" aria-label="Draft candidate location"></button>
-                </div>
-              </div>
+              <div class="map-canvas" id="mapCanvas" aria-label="Interactive GeoGrub planning map"></div>
             </div>
 
             <div class="result-grid">
@@ -194,6 +180,7 @@
       </section>
     </main>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="./script.js"></script>
   </body>
 </html>

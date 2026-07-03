@@ -1,5 +1,20 @@
 const storageKey = "geogrub.mvp.plan";
 
+const marketCenters = {
+  "austin": [30.2672, -97.7431],
+  "austin, tx": [30.2672, -97.7431],
+  "seattle": [47.6062, -122.3321],
+  "seattle, wa": [47.6062, -122.3321],
+  "atlanta": [33.749, -84.388],
+  "atlanta, ga": [33.749, -84.388],
+  "new york": [40.7128, -74.006],
+  "new york city": [40.7128, -74.006],
+  "los angeles": [34.0522, -118.2437],
+  "la": [34.0522, -118.2437],
+  "seoul": [37.5665, 126.978],
+  "seoul, korea": [37.5665, 126.978]
+};
+
 const seedPlan = {
   name: "Weekend taco route",
   market: "Austin, TX",
@@ -16,8 +31,8 @@ const seedPlan = {
       weather: 81,
       competition: 72,
       permit: 74,
-      x: 72,
-      y: 42
+      lat: 30.2983,
+      lng: -97.7045
     },
     {
       id: crypto.randomUUID(),
@@ -28,8 +43,8 @@ const seedPlan = {
       weather: 72,
       competition: 64,
       permit: 54,
-      x: 34,
-      y: 34
+      lat: 30.2587,
+      lng: -97.7381
     },
     {
       id: crypto.randomUUID(),
@@ -40,8 +55,8 @@ const seedPlan = {
       weather: 69,
       competition: 58,
       permit: 62,
-      x: 51,
-      y: 70
+      lat: 30.2849,
+      lng: -97.7419
     }
   ]
 };
@@ -59,21 +74,14 @@ const daypartModifiers = {
   weekend: { label: "Weekend market", event: 1.06, access: 1, weather: 1.02, competition: 1, permit: 1.02, times: ["9:30a", "12:00p", "3:00p"] }
 };
 
-let plan = loadPlan();
+let plan = normalizePlan(loadPlan());
 let rebalanceOffset = 0;
 let selectedLocationId = null;
 let draftPoint = null;
-const mapState = {
-  zoom: 1,
-  offsetX: 0,
-  offsetY: 0,
-  isDragging: false,
-  dragStartX: 0,
-  dragStartY: 0,
-  startOffsetX: 0,
-  startOffsetY: 0,
-  moved: false
-};
+let map = null;
+let markerLayer = null;
+let draftMarker = null;
+let locationMarkers = new Map();
 
 const els = {
   navPills: document.querySelectorAll(".nav-pill"),
@@ -90,9 +98,6 @@ const els = {
   mapTitle: document.querySelector("#mapTitle"),
   avgScore: document.querySelector("#avgScore"),
   mapCanvas: document.querySelector("#mapCanvas"),
-  mapWorld: document.querySelector("#mapWorld"),
-  pinLayer: document.querySelector("#pinLayer"),
-  draftPin: document.querySelector("#draftPin"),
   mapStatus: document.querySelector("#mapStatus"),
   zoomInBtn: document.querySelector("#zoomInBtn"),
   zoomOutBtn: document.querySelector("#zoomOutBtn"),
@@ -126,16 +131,42 @@ function loadPlan() {
   }
 }
 
+function normalizePlan(rawPlan) {
+  const fallbackCenter = getMarketCenter(rawPlan.market || seedPlan.market);
+  return {
+    ...rawPlan,
+    locations: rawPlan.locations.map((location, index) => {
+      if (Number.isFinite(location.lat) && Number.isFinite(location.lng)) return location;
+      const offset = (index + 1) * 0.012;
+      return {
+        ...location,
+        lat: fallbackCenter[0] + offset,
+        lng: fallbackCenter[1] - offset
+      };
+    })
+  };
+}
+
 function savePlan() {
   localStorage.setItem(storageKey, JSON.stringify(plan));
 }
 
+function getMarketCenter(market) {
+  const key = String(market || "").trim().toLowerCase();
+  return marketCenters[key] || marketCenters.austin;
+}
+
 function syncPlanFromInputs() {
+  const previousMarket = plan.market;
   plan.name = els.planName.value.trim() || "Untitled GeoGrub plan";
   plan.market = els.marketName.value.trim() || "Custom market";
   plan.vendor = els.vendor.value;
   plan.daypart = els.daypart.value;
   plan.weatherTolerance = Number(els.weatherTolerance.value);
+
+  if (map && previousMarket !== plan.market && marketCenters[plan.market.toLowerCase()]) {
+    map.setView(getMarketCenter(plan.market), 13);
+  }
 }
 
 function hydrateInputs() {
@@ -151,6 +182,10 @@ function clampScore(value) {
   return Math.max(0, Math.min(99, Math.round(value)));
 }
 
+function formatLatLng(point) {
+  return `${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}`;
+}
+
 function scoreLocation(location) {
   const vendor = vendorModifiers[plan.vendor];
   const daypart = daypartModifiers[plan.daypart];
@@ -164,42 +199,6 @@ function scoreLocation(location) {
     rebalanceOffset;
 
   return clampScore(raw);
-}
-
-function clampMapCoordinate(value) {
-  return Math.max(4, Math.min(96, Math.round(value)));
-}
-
-function applyMapTransform() {
-  els.mapWorld.style.transform = `translate(${mapState.offsetX}px, ${mapState.offsetY}px) scale(${mapState.zoom})`;
-}
-
-function screenToMapPoint(clientX, clientY) {
-  const rect = els.mapCanvas.getBoundingClientRect();
-  const x = ((clientX - rect.left - mapState.offsetX) / mapState.zoom / rect.width) * 100;
-  const y = ((clientY - rect.top - mapState.offsetY) / mapState.zoom / rect.height) * 100;
-  return {
-    x: clampMapCoordinate(x),
-    y: clampMapCoordinate(y)
-  };
-}
-
-function setDraftPoint(point) {
-  draftPoint = point;
-  els.coordinateReadout.textContent = `Map point: ${point.x}, ${point.y}`;
-  els.mapStatus.textContent = `Next candidate will be placed at ${point.x}, ${point.y}.`;
-  renderDraftPin();
-}
-
-function renderDraftPin() {
-  if (!draftPoint) {
-    els.draftPin.classList.add("hidden");
-    els.coordinateReadout.textContent = "Map point: auto";
-    return;
-  }
-  els.draftPin.classList.remove("hidden");
-  els.draftPin.style.left = `${draftPoint.x}%`;
-  els.draftPin.style.top = `${draftPoint.y}%`;
 }
 
 function scoreDrivers(location) {
@@ -237,25 +236,97 @@ function recommendation(location, index) {
   };
 }
 
+function initMap() {
+  if (!window.L) {
+    els.mapCanvas.innerHTML = '<div class="map-fallback">Map tiles could not load. Check your network connection and reload.</div>';
+    els.mapStatus.textContent = "Map provider unavailable.";
+    return;
+  }
+
+  map = L.map("mapCanvas", {
+    zoomControl: false,
+    scrollWheelZoom: true
+  }).setView(getMarketCenter(plan.market), 13);
+
+  L.control.zoom({ position: "bottomleft" }).addTo(map);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+  }).addTo(map);
+
+  markerLayer = L.layerGroup().addTo(map);
+  map.on("click", (event) => setDraftPoint(event.latlng));
+}
+
+function fitMapToLocations() {
+  if (!map || !plan.locations.length) return;
+  const bounds = L.latLngBounds(plan.locations.map((location) => [location.lat, location.lng]));
+  map.fitBounds(bounds.pad(0.22), { maxZoom: 14 });
+}
+
+function markerHtml(location, index) {
+  return `
+    <button class="real-map-marker ${location.id === selectedLocationId ? "selected" : ""}" type="button">
+      <span>${index + 1}</span>
+      <strong>${location.score}</strong>
+    </button>
+  `;
+}
+
 function renderMap(ranked) {
-  els.pinLayer.innerHTML = "";
+  if (!map || !markerLayer) return;
+  markerLayer.clearLayers();
+  locationMarkers = new Map();
+
   ranked.forEach((location, index) => {
-    const pin = document.createElement("button");
-    pin.className = "map-pin";
-    pin.type = "button";
-    pin.dataset.locationId = location.id;
-    pin.classList.toggle("selected", location.id === selectedLocationId);
-    pin.style.left = `${location.x}%`;
-    pin.style.top = `${location.y}%`;
-    pin.innerHTML = `
-      <strong>${index + 1}. ${escapeHtml(location.name)}</strong>
-      <small>${escapeHtml(location.cue)}</small>
-      <span class="pin-score">${location.score}</span>
-    `;
-    els.pinLayer.appendChild(pin);
+    const marker = L.marker([location.lat, location.lng], {
+      icon: L.divIcon({
+        className: "geogrub-marker-wrap",
+        html: markerHtml(location, index),
+        iconSize: [52, 52],
+        iconAnchor: [26, 46],
+        popupAnchor: [0, -44]
+      })
+    });
+
+    marker.bindPopup(`
+      <strong>${escapeHtml(location.name)}</strong>
+      <p>${escapeHtml(location.cue)}</p>
+      <small>Fit ${location.score}/99 · ${formatLatLng(location)}</small>
+    `);
+    marker.on("click", () => focusLocation(location.id));
+    marker.addTo(markerLayer);
+    locationMarkers.set(location.id, marker);
   });
-  renderDraftPin();
-  applyMapTransform();
+
+  renderDraftMarker();
+}
+
+function setDraftPoint(latlng) {
+  draftPoint = { lat: latlng.lat, lng: latlng.lng };
+  els.coordinateReadout.textContent = `Map point: ${formatLatLng(draftPoint)}`;
+  els.mapStatus.textContent = `Next candidate will be placed at ${formatLatLng(draftPoint)}.`;
+  renderDraftMarker();
+}
+
+function renderDraftMarker() {
+  if (!map) return;
+  if (draftMarker) {
+    draftMarker.remove();
+    draftMarker = null;
+  }
+  if (!draftPoint) {
+    els.coordinateReadout.textContent = "Map point: auto";
+    return;
+  }
+  draftMarker = L.marker([draftPoint.lat, draftPoint.lng], {
+    icon: L.divIcon({
+      className: "draft-marker-wrap",
+      html: '<span class="draft-real-marker"></span>',
+      iconSize: [30, 42],
+      iconAnchor: [15, 36]
+    })
+  }).addTo(map);
 }
 
 function renderLocations(ranked) {
@@ -273,6 +344,7 @@ function renderLocations(ranked) {
               <span>Weather ${location.weather}</span>
               <span>Comp ${location.competition}</span>
               <span>Permit ${location.permit}</span>
+              <span>${formatLatLng(location)}</span>
             </div>
           </div>
           <div class="metric-stack">
@@ -330,7 +402,7 @@ ${ranked
     const strengths = location.drivers.strengths.join(", ") || "balanced fundamentals";
     const risks = location.drivers.risks.join(", ") || "no major red flags";
     return `${index + 1}. ${location.name} - ${location.score}/99
-   - Map point: ${location.x}, ${location.y}
+   - Coordinates: ${formatLatLng(location)}
    - Best time: ${rec.time}
    - Strengths: ${strengths}
    - Risks: ${risks}
@@ -378,6 +450,9 @@ function escapeHtml(value) {
 
 function addCandidate(event) {
   event.preventDefault();
+  const marketCenter = getMarketCenter(plan.market);
+  const fallbackCenter = map ? map.getCenter() : { lat: marketCenter[0], lng: marketCenter[1] };
+  const point = draftPoint || { lat: fallbackCenter.lat, lng: fallbackCenter.lng };
   plan.locations.push({
     id: crypto.randomUUID(),
     name: els.candidateName.value.trim(),
@@ -387,8 +462,8 @@ function addCandidate(event) {
     weather: Number(els.weatherScore.value),
     competition: Number(els.competitionScore.value),
     permit: Number(els.permitScore.value),
-    x: draftPoint?.x ?? 18 + Math.round(Math.random() * 64),
-    y: draftPoint?.y ?? 24 + Math.round(Math.random() * 52)
+    lat: point.lat,
+    lng: point.lng
   });
   draftPoint = null;
   els.candidateForm.reset();
@@ -398,32 +473,31 @@ function addCandidate(event) {
 
 function focusLocation(locationId) {
   const location = plan.locations.find((item) => item.id === locationId);
-  if (!location) return;
+  if (!location || !map) return;
   selectedLocationId = locationId;
-  const rect = els.mapCanvas.getBoundingClientRect();
-  mapState.offsetX = rect.width / 2 - (location.x / 100) * rect.width * mapState.zoom;
-  mapState.offsetY = rect.height / 2 - (location.y / 100) * rect.height * mapState.zoom;
-  els.mapStatus.textContent = `Focused ${location.name} at ${location.x}, ${location.y}.`;
+  map.setView([location.lat, location.lng], Math.max(map.getZoom(), 15));
+  els.mapStatus.textContent = `Focused ${location.name} at ${formatLatLng(location)}.`;
   render();
-}
-
-function zoomMap(delta) {
-  mapState.zoom = Math.max(0.75, Math.min(2.2, Number((mapState.zoom + delta).toFixed(2))));
-  applyMapTransform();
+  locationMarkers.get(locationId)?.openPopup();
 }
 
 function centerMap() {
-  mapState.zoom = 1;
-  mapState.offsetX = 0;
-  mapState.offsetY = 0;
   selectedLocationId = null;
-  els.mapStatus.textContent = "Map centered. Click to place the next candidate.";
+  if (plan.locations.length) {
+    fitMapToLocations();
+  } else if (map) {
+    map.setView(getMarketCenter(plan.market), 13);
+  }
+  els.mapStatus.textContent = "Map centered. Click a real location to place the next candidate.";
   render();
 }
 
 function switchView(view) {
   els.navPills.forEach((button) => button.classList.toggle("active", button.dataset.view === view));
   els.views.forEach((panel) => panel.classList.toggle("active", panel.dataset.panel === view));
+  if (view === "plan" && map) {
+    setTimeout(() => map.invalidateSize(), 0);
+  }
 }
 
 function downloadReport() {
@@ -437,12 +511,20 @@ function downloadReport() {
 }
 
 hydrateInputs();
+initMap();
 render();
+fitMapToLocations();
 
-[els.planName, els.marketName, els.vendor, els.daypart, els.weatherTolerance].forEach((field) => {
+[els.planName, els.vendor, els.daypart, els.weatherTolerance].forEach((field) => {
   field.addEventListener("input", render);
   field.addEventListener("change", render);
 });
+
+els.marketName.addEventListener("change", () => {
+  render();
+  if (map) map.setView(getMarketCenter(plan.market), 13);
+});
+els.marketName.addEventListener("input", render);
 
 els.candidateForm.addEventListener("submit", addCandidate);
 els.savePlanBtn.addEventListener("click", () => {
@@ -455,16 +537,14 @@ els.savePlanBtn.addEventListener("click", () => {
 });
 
 els.resetBtn.addEventListener("click", () => {
-  plan = structuredClone(seedPlan);
+  plan = normalizePlan(structuredClone(seedPlan));
   rebalanceOffset = 0;
   selectedLocationId = null;
   draftPoint = null;
-  mapState.zoom = 1;
-  mapState.offsetX = 0;
-  mapState.offsetY = 0;
   localStorage.removeItem(storageKey);
   hydrateInputs();
   render();
+  fitMapToLocations();
 });
 
 els.rebalanceBtn.addEventListener("click", () => {
@@ -486,83 +566,13 @@ els.locations.addEventListener("click", (event) => {
   render();
 });
 
-els.pinLayer.addEventListener("click", (event) => {
-  const pin = event.target.closest("[data-location-id]");
-  if (!pin) return;
-  event.stopPropagation();
-  focusLocation(pin.dataset.locationId);
-});
-
-els.mapCanvas.addEventListener("pointerdown", (event) => {
-  if (event.target.closest(".map-pin") || event.target.closest(".draft-pin")) return;
-  mapState.isDragging = true;
-  mapState.moved = false;
-  mapState.dragStartX = event.clientX;
-  mapState.dragStartY = event.clientY;
-  mapState.startOffsetX = mapState.offsetX;
-  mapState.startOffsetY = mapState.offsetY;
-  els.mapCanvas.setPointerCapture(event.pointerId);
-});
-
-els.mapCanvas.addEventListener("pointermove", (event) => {
-  if (!mapState.isDragging) return;
-  const dx = event.clientX - mapState.dragStartX;
-  const dy = event.clientY - mapState.dragStartY;
-  if (Math.abs(dx) + Math.abs(dy) > 6) mapState.moved = true;
-  mapState.offsetX = mapState.startOffsetX + dx;
-  mapState.offsetY = mapState.startOffsetY + dy;
-  applyMapTransform();
-});
-
-els.mapCanvas.addEventListener("pointerup", (event) => {
-  if (!mapState.isDragging) return;
-  els.mapCanvas.releasePointerCapture(event.pointerId);
-  mapState.isDragging = false;
-  if (!mapState.moved) {
-    setDraftPoint(screenToMapPoint(event.clientX, event.clientY));
-  } else {
-    els.mapStatus.textContent = "Map moved. Click a spot to place the next candidate.";
-  }
-});
-
-els.mapCanvas.addEventListener("wheel", (event) => {
-  event.preventDefault();
-  zoomMap(event.deltaY < 0 ? 0.12 : -0.12);
-}, { passive: false });
-
-els.mapCanvas.addEventListener("keydown", (event) => {
-  const step = event.shiftKey ? 48 : 24;
-  const panKeys = {
-    ArrowUp: [0, step],
-    ArrowDown: [0, -step],
-    ArrowLeft: [step, 0],
-    ArrowRight: [-step, 0]
-  };
-  if (event.key === "+" || event.key === "=") {
-    event.preventDefault();
-    zoomMap(0.12);
-    return;
-  }
-  if (event.key === "-") {
-    event.preventDefault();
-    zoomMap(-0.12);
-    return;
-  }
-  if (!panKeys[event.key]) return;
-  event.preventDefault();
-  mapState.offsetX += panKeys[event.key][0];
-  mapState.offsetY += panKeys[event.key][1];
-  els.mapStatus.textContent = "Map moved. Click a spot to place the next candidate.";
-  applyMapTransform();
-});
-
-els.zoomInBtn.addEventListener("click", () => zoomMap(0.2));
-els.zoomOutBtn.addEventListener("click", () => zoomMap(-0.2));
+els.zoomInBtn.addEventListener("click", () => map?.zoomIn());
+els.zoomOutBtn.addEventListener("click", () => map?.zoomOut());
 els.centerMapBtn.addEventListener("click", centerMap);
 els.clearDraftBtn.addEventListener("click", () => {
   draftPoint = null;
-  els.mapStatus.textContent = "Draft point cleared. Click the map to place the next candidate.";
-  renderDraftPin();
+  els.mapStatus.textContent = "Draft point cleared. Click the real map to place the next candidate.";
+  renderDraftMarker();
 });
 
 els.navPills.forEach((button) => {

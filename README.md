@@ -9,10 +9,10 @@ The app helps vendors compare possible stops, score operating fit, build a short
 - Create a named pop-up or food truck plan.
 - Set market, vendor type, selling window, and weather tolerance.
 - Add custom candidate locations.
-- Place candidates on an interactive map.
+- Place candidates on a real Leaflet/OpenStreetMap map.
 - Click map pins or ranked cards to focus a location.
-- Zoom with map controls, mouse wheel, or plus/minus keys.
-- Pan the map by dragging or using arrow keys while the map is focused.
+- Zoom with map controls or mouse wheel.
+- Pan the map by dragging.
 - Score each location across event demand, access, weather fit, competition pressure, and permit readiness.
 - Re-rank stops using a transparent scoring model.
 - Remove weak candidates.
@@ -50,9 +50,11 @@ Then visit:
 http://127.0.0.1:4177/
 ```
 
+The map uses Leaflet and OpenStreetMap tiles from public CDNs, so it needs an internet connection when opened.
+
 ## Future production integrations
 
-- Google Places or Mapbox for place discovery and maps
+- Google Places, Google Maps, or Mapbox for place discovery and production-grade maps
 - Eventbrite, PredictHQ, Ticketmaster, or city calendars for event demand
 - Weather API for forecast-aware scoring
 - City permit pages or manually curated permit datasets
